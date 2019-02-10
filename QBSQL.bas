@@ -75,7 +75,7 @@ FUNCTION deleteFrom%% (this$, __where$)
         EXIT FUNCTION
     END IF
 
-    set$ = __set$
+    where$ = __where$
     IF tableExists(this$, index$) = 0 THEN
         IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
@@ -157,7 +157,7 @@ FUNCTION deleteFrom%% (this$, __where$)
 
     'perform the deletion; go through whole table
     totalRecords& = 0
-    FOR i& = 1 TO recordCount(this$)
+    FOR i& = 1 TO recordMax(this$)
         IF ReadSetting("", thisTable$ + "-" + LTRIM$(STR$(i&)), "state") = "deleted" THEN _CONTINUE
         conditionsMet = -1
         FOR check& = 1 TO totalConditions
@@ -189,9 +189,7 @@ FUNCTION deleteFrom%% (this$, __where$)
         IF conditionsMet THEN
             'mark this record for deletion; decrease record count
             totalRecords& = totalRecords& + 1
-            FOR commit& = 1 TO totalItemsInSet
-                WriteSetting "", thisTable$ + "-" + LTRIM$(STR$(i&)), "state", "deleted"
-            NEXT
+            WriteSetting "", thisTable$ + "-" + LTRIM$(STR$(i&)), "state", "deleted"
         END IF
     NEXT
 
@@ -359,7 +357,7 @@ FUNCTION update%% (this$, __set$, where$)
 
     'perform the update; go through whole table
     totalRecords& = 0
-    FOR i& = 1 TO recordCount(this$)
+    FOR i& = 1 TO recordMax(this$)
         IF ReadSetting("", thisTable$ + "-" + LTRIM$(STR$(i&)), "state") = "deleted" THEN _CONTINUE
         conditionsMet = -1
         FOR check& = 1 TO totalConditions
@@ -606,6 +604,16 @@ FUNCTION recordCount& (this$)
     recordCount& = VAL(ReadSetting("", "table-" + index$, "recordcount"))
 END FUNCTION
 
+FUNCTION recordMax& (this$)
+    IF tableExists(this$, index$) = 0 THEN
+        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        EXIT FUNCTION
+    END IF
+
+    recordMax& = VAL(ReadSetting("", "table-" + index$, "recordindex"))
+END FUNCTION
+
+
 FUNCTION dropTable%% (this$)
     SHARED currentIniFileName$
     IF currentIniFileName$ = "" THEN
@@ -643,9 +651,13 @@ FUNCTION truncateTable%% (this$)
     END IF
 
     'mark all records for deletion:
-    totalRecords& = recordCount(this$)
+    totalRecords& = recordMax(this$)
+    totalMarked& = 0
     FOR i& = 1 TO totalRecords&
+        check$ = ReadSetting("", "table-" + index$ + "-" + LTRIM$(STR$(i&)), "state")
+        IF check$ = "deleted" OR IniCODE > 0 THEN _CONTINUE
         WriteSetting "", "table-" + index$ + "-" + LTRIM$(STR$(i&)), "state", "deleted"
+        totalMarked& = totalMarked& + 1
     NEXT
 
     WriteSetting "", "table-" + index$, "recordcount", "0"
@@ -661,7 +673,7 @@ FUNCTION truncateTable%% (this$)
     NEXT
 
     truncateTable%% = -1
-    IF verbose THEN PRINT "Table '" + this$ + "' truncated;"; totalRecords&; "marked for deletion."
+    IF verbose THEN PRINT "Table '" + this$ + "' truncated;"; totalMarked&; "marked for deletion."
 END FUNCTION
 
 FUNCTION pack%%
