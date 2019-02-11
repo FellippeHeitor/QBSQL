@@ -1,83 +1,32 @@
-CONST verbose = -1
+'QBSQL - Simple database manager using INI-manager library
+'Draws inspiration from SQL, hence the name.
+'Fellippe Heitor, 2019
 
-result = createDatabase("testDB", "")
-IF NOT result THEN
-    result = loadDatabase("testDB", tableCount$)
-    IF NOT result THEN PRINT "Error creating/loading database": END
-    PRINT "Database loaded; "; tablecount; " tables."
-END IF
+SUB QBSQL_Initialize
+    SHARED IniDisableAutoCommit
+    IniDisableAutoCommit = -1
+END SUB
 
-SLEEP
-
-result = createTable("Persons", "PersonID autoincrement:primary:int,LastName text,FirstName text,Address text,City text")
-IF NOT result THEN PRINT "Error creating table 1.": END
-
-SLEEP
-
-result = insertInto("Persons", "LastName,FirstName,City", _
-                               "'Heitor','Fellippe','Carandiru';'Soames','Carly','Etoile';'Sinclair','Clair','Carandiru'")
-IF NOT result THEN PRINT "Error inserting record(s).": END
-
-SLEEP
-
-result = update("Persons", "Address='43 Fifth Avenue - St. Michel',City='Etoile'", _
-                           "")
-IF NOT result THEN PRINT "Error updating record(s).": END
-
-SLEEP
-
-result = insertInto("Persons", "", _
-                               "'Heitor','Robert','52nd - Saint Louise','Etoile'")
-IF NOT result THEN PRINT "Error inserting record(s).": END
-
-SLEEP
-
-result = deleteFrom("Persons", "FirstName='Fellippe'")
-IF NOT result THEN PRINT "Error deleting record.": END
-
-SLEEP
-
-result = truncateTable("Persons")
-IF NOT result THEN PRINT "Error truncating table 1.": END
-
-SLEEP
-
-result = pack
-IF NOT result THEN PRINT "Error packing database": END
-
-SLEEP
-
-result = dropTable("Persons")
-IF NOT result THEN PRINT "Error dropping table 1.": END
-
-SLEEP
-
-result = createTable("Persons", "PersonID autoincrement:primary:int,LastName text,FirstName text,Address text,City text")
-IF NOT result THEN PRINT "Error creating table 2.": END
-
-SLEEP
-
-result = insertInto("Persons", "", _
-                               "'Heitor','Robert','52nd - Saint Louise','Etoile'")
-IF NOT result THEN PRINT "Error inserting record(s).": END
-
-SLEEP
-
-result = pack
-IF NOT result THEN PRINT "Error packing database": END
+FUNCTION commit%%
+    SHARED IniDisableAutoCommit
+    IniDisableAutoCommit = 0
+    IniCommit
+    IniDisableAutoCommit = -1
+    commit%% = -1
+END FUNCTION
 
 FUNCTION deleteFrom%% (this$, __where$)
     'DELETE FROM Customers WHERE CustomerName='Alfreds Futterkiste';
 
     SHARED currentIniFileName$, IniCODE
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     where$ = __where$
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
 
@@ -122,7 +71,7 @@ FUNCTION deleteFrom%% (this$, __where$)
                         eq = INSTR(thisArg$, ">")
                         IF eq = 0 THEN
                             'syntax error
-                            IF verbose THEN PRINT "Condition requires =, <>, < or > operators in WHERE clause."
+                            IF QBSQL_verbose THEN PRINT "Condition requires =, <>, < or > operators in WHERE clause."
                             EXIT FUNCTION
                         ELSE
                             condition$(columns, 2) = ">"
@@ -148,7 +97,7 @@ FUNCTION deleteFrom%% (this$, __where$)
             condition$(columns, 3) = thisValue$
             IF INSTR(columnSummary$, "/" + thisArg$ + "/") = 0 THEN
                 'this column does not exist
-                IF verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
+                IF QBSQL_verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
                 EXIT FUNCTION
             END IF
         LOOP WHILE c > 0
@@ -194,7 +143,7 @@ FUNCTION deleteFrom%% (this$, __where$)
     NEXT
 
     deleteFrom%% = -1
-    IF verbose THEN PRINT totalRecords&; "records marked for deletion."
+    IF QBSQL_verbose THEN PRINT totalRecords&; "records marked for deletion."
 END FUNCTION
 
 FUNCTION update%% (this$, __set$, where$)
@@ -204,17 +153,17 @@ FUNCTION update%% (this$, __set$, where$)
 
     SHARED currentIniFileName$, IniCODE
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     set$ = __set$
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
     IF LEN(set$) = 0 THEN
-        IF verbose THEN PRINT "Invalid syntax: SET not passed."
+        IF QBSQL_verbose THEN PRINT "Invalid syntax: SET not passed."
         EXIT FUNCTION
     END IF
 
@@ -252,7 +201,7 @@ FUNCTION update%% (this$, __set$, where$)
         eq = INSTR(thisArg$, "=")
         IF eq = 0 THEN
             'syntax error
-            IF verbose THEN PRINT "Invalid syntax; expected key=value format in SET."
+            IF QBSQL_verbose THEN PRINT "Invalid syntax; expected key=value format in SET."
             EXIT FUNCTION
         END IF
 
@@ -267,7 +216,7 @@ FUNCTION update%% (this$, __set$, where$)
         dataSet$(columns, 2) = Replace(thisValue$, "\,", ",", 0, 0)
         IF INSTR(columnSummary$, "/" + thisArg$ + "/") = 0 THEN
             'this column does not exist
-            IF verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
+            IF QBSQL_verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
             EXIT FUNCTION
         END IF
 
@@ -279,7 +228,7 @@ FUNCTION update%% (this$, __set$, where$)
                 thisColumn$ = ReadSetting("", thisTable$, "column-" + LTRIM$(RTRIM$(STR$(i&))) + "-name")
                 IF thisColumn$ = thisArg$ THEN
                     'can't directly specify the value of an autoincrement column
-                    IF verbose THEN PRINT "Cannot set column '" + thisArg$ + "' as it is set to autoincrement in table '" + this$ + "'."
+                    IF QBSQL_verbose THEN PRINT "Cannot set column '" + thisArg$ + "' as it is set to autoincrement in table '" + this$ + "'."
                     EXIT FUNCTION
                 END IF
             END IF
@@ -322,7 +271,7 @@ FUNCTION update%% (this$, __set$, where$)
                         eq = INSTR(thisArg$, ">")
                         IF eq = 0 THEN
                             'syntax error
-                            IF verbose THEN PRINT "Condition requires =, <>, < or > operators in WHERE clause."
+                            IF QBSQL_verbose THEN PRINT "Condition requires =, <>, < or > operators in WHERE clause."
                             EXIT FUNCTION
                         ELSE
                             condition$(columns, 2) = ">"
@@ -348,7 +297,7 @@ FUNCTION update%% (this$, __set$, where$)
             condition$(columns, 3) = thisValue$
             IF INSTR(columnSummary$, "/" + thisArg$ + "/") = 0 THEN
                 'this column does not exist
-                IF verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
+                IF QBSQL_verbose THEN PRINT "Column '" + thisArg$ + "' does not exist in table '" + this$ + "'."
                 EXIT FUNCTION
             END IF
         LOOP WHILE c > 0
@@ -389,14 +338,14 @@ FUNCTION update%% (this$, __set$, where$)
         IF conditionsMet THEN
             'update this record
             totalRecords& = totalRecords& + 1
-            FOR commit& = 1 TO totalItemsInSet
-                WriteSetting "", thisTable$ + "-" + LTRIM$(STR$(i&)), dataSet$(commit&, 1), dataSet$(commit&, 2)
+            FOR commitUpdate& = 1 TO totalItemsInSet
+                WriteSetting "", thisTable$ + "-" + LTRIM$(STR$(i&)), dataSet$(commitUpdate&, 1), dataSet$(commitUpdate&, 2)
             NEXT
         END IF
     NEXT
 
     update%% = -1
-    IF verbose THEN PRINT totalRecords&; "records affected."
+    IF QBSQL_verbose THEN PRINT totalRecords&; "records affected."
 END FUNCTION
 
 FUNCTION insertInto%% (this$, columns$, __values$)
@@ -405,17 +354,17 @@ FUNCTION insertInto%% (this$, columns$, __values$)
 
     SHARED currentIniFileName$, IniCODE
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     values$ = __values$
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
     IF LEN(values$) = 0 THEN
-        IF verbose THEN PRINT "No values passed."
+        IF QBSQL_verbose THEN PRINT "No values passed."
         EXIT FUNCTION
     END IF
 
@@ -458,7 +407,7 @@ FUNCTION insertInto%% (this$, columns$, __values$)
             columnName$(totalColumns) = thisArg$
             IF INSTR(columnSummary$, "/" + thisArg$ + "/") = 0 THEN
                 'this column does not exist
-                IF verbose THEN PRINT "Column '" + thisArg$ + "' doesn't exist in table '" + this$ + "'."
+                IF QBSQL_verbose THEN PRINT "Column '" + thisArg$ + "' doesn't exist in table '" + this$ + "'."
                 EXIT FUNCTION
             END IF
 
@@ -475,7 +424,7 @@ FUNCTION insertInto%% (this$, columns$, __values$)
                     thisColumn$ = ReadSetting("", thisTable$, "column-" + LTRIM$(RTRIM$(STR$(i&))) + "-name")
                     IF thisColumn$ = thisArg$ THEN
                         'can't directly specify the value of an autoincrement column
-                        IF verbose THEN PRINT "Cannot set column '" + thisArg$ + "' as it is set to autoincrement in table '" + this$ + "'."
+                        IF QBSQL_verbose THEN PRINT "Cannot set column '" + thisArg$ + "' as it is set to autoincrement in table '" + this$ + "'."
                         EXIT FUNCTION
                     END IF
                 END IF
@@ -534,7 +483,7 @@ FUNCTION insertInto%% (this$, columns$, __values$)
             columns = columns + 1
             IF columns > UBOUND(columnName$) THEN
                 'invalid dataset passed
-                IF verbose THEN PRINT "SET: invalid number of columns passed."
+                IF QBSQL_verbose THEN PRINT "SET: invalid number of columns passed."
                 EXIT FUNCTION
             END IF
 
@@ -567,7 +516,7 @@ FUNCTION insertInto%% (this$, columns$, __values$)
     LOOP
 
     insertInto%% = -1
-    IF verbose THEN PRINT totalRecords&; "records inserted."
+    IF QBSQL_verbose THEN PRINT totalRecords&; "records inserted."
 END FUNCTION
 
 FUNCTION validateValue$ (__value$, __dataType$)
@@ -597,7 +546,7 @@ END FUNCTION
 
 FUNCTION recordCount& (this$)
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
 
@@ -606,7 +555,7 @@ END FUNCTION
 
 FUNCTION recordMax& (this$)
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
 
@@ -617,12 +566,12 @@ END FUNCTION
 FUNCTION dropTable%% (this$)
     SHARED currentIniFileName$
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
 
@@ -635,18 +584,18 @@ FUNCTION dropTable%% (this$)
     WriteSetting "", "database", "tablecount", STR$(VAL(ReadSetting("", "database", "tablecount")) - 1)
 
     dropTable%% = -1
-    IF verbose THEN PRINT "Table '" + this$ + "' dropped."
+    IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' dropped."
 END FUNCTION
 
 FUNCTION truncateTable%% (this$)
     SHARED currentIniFileName$, IniCODE
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     IF tableExists(this$, index$) = 0 THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
 
@@ -673,7 +622,7 @@ FUNCTION truncateTable%% (this$)
     NEXT
 
     truncateTable%% = -1
-    IF verbose THEN PRINT "Table '" + this$ + "' truncated;"; totalMarked&; "marked for deletion."
+    IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' truncated;"; totalMarked&; "marked for deletion."
 END FUNCTION
 
 FUNCTION pack%%
@@ -681,7 +630,7 @@ FUNCTION pack%%
     SHARED IniLastSection$, IniLastKey$
 
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
@@ -700,7 +649,7 @@ FUNCTION pack%%
     LOOP
 
     pack%% = -1
-    IF verbose THEN PRINT "Database successfully purged."
+    IF QBSQL_verbose THEN PRINT "Database successfully purged."
 END FUNCTION
 
 FUNCTION tableExists%% (this$, index$)
@@ -728,12 +677,12 @@ FUNCTION createTable%% (this$, arg$)
 
     SHARED currentIniFileName$
     IF currentIniFileName$ = "" THEN
-        IF verbose THEN PRINT "No database loaded."
+        IF QBSQL_verbose THEN PRINT "No database loaded."
         EXIT FUNCTION
     END IF
 
     IF tableExists(this$, index$) THEN
-        IF verbose THEN PRINT "Table '" + this$ + "' does not exist"
+        IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' does not exist"
         EXIT FUNCTION
     END IF
 
@@ -757,7 +706,7 @@ FUNCTION createTable%% (this$, arg$)
     WriteSetting "", newTable$, "recordindex", "0"
 
     IF LEN(arg$) = 0 THEN
-        IF verbose THEN PRINT "Table structure not passed."
+        IF QBSQL_verbose THEN PRINT "Table structure not passed."
         EXIT FUNCTION
     END IF
 
@@ -784,7 +733,7 @@ FUNCTION createTable%% (this$, arg$)
 
         IF INSTR(columnSummary$, "/" + thisColumn$ + "/") > 0 THEN
             'duplicated column definition
-            IF verbose THEN PRINT "Column '" + thisColumn$ + "' defined more than once."
+            IF QBSQL_verbose THEN PRINT "Column '" + thisColumn$ + "' defined more than once."
             EXIT FUNCTION
         END IF
         columnSummary$ = columnSummary$ + thisColumn$ + "/"
@@ -799,7 +748,7 @@ FUNCTION createTable%% (this$, arg$)
         IF checkConstraint(thisType$, "autoincrement") THEN
             WriteSetting "", newTable$, "column-" + LTRIM$(STR$(columns)) + "-autoincrement", "0"
             IF thisType$ <> "int" THEN
-                IF verbose THEN PRINT "Autoincrement columns must be of type INT."
+                IF QBSQL_verbose THEN PRINT "Autoincrement columns must be of type INT."
                 EXIT FUNCTION
             END IF
         END IF
@@ -811,7 +760,7 @@ FUNCTION createTable%% (this$, arg$)
     WriteSetting "", newTable$, "columnsummary", columnSummary$
 
     createTable%% = -1
-    IF verbose THEN PRINT "Table '" + this$ + "' created;"; columns; "columns defined."
+    IF QBSQL_verbose THEN PRINT "Table '" + this$ + "' created;"; columns; "columns defined."
 END FUNCTION
 
 FUNCTION checkConstraint%% (__this$, __constraint$)
@@ -831,7 +780,7 @@ FUNCTION loadDatabase%% (this$, tableCount$)
     IF _FILEEXISTS(fileName$) THEN
         tableCount$ = ReadSetting(fileName$, "database", "tablecount")
         loadDatabase%% = -1
-        IF verbose THEN PRINT "Database loaded."
+        IF QBSQL_verbose THEN PRINT "Database loaded."
     END IF
 END FUNCTION
 
@@ -840,7 +789,7 @@ FUNCTION createDatabase%% (this$, arg$)
 
     IF _FILEEXISTS(fileName$) THEN
         IF UCASE$(arg$) = "IF NOT EXISTS" THEN
-            IF verbose THEN PRINT "Database already exists."
+            IF QBSQL_verbose THEN PRINT "Database already exists."
             EXIT FUNCTION
         END IF
         KILL fileName$
@@ -852,7 +801,7 @@ FUNCTION createDatabase%% (this$, arg$)
     WriteSetting "", "database", "tablecount", "0"
     WriteSetting "", "database", "tableindex", "0"
     createDatabase%% = -1
-    IF verbose THEN PRINT "Database successfully created."
+    IF QBSQL_verbose THEN PRINT "Database successfully created."
 END FUNCTION
 
 FUNCTION dropDatabase%% (this$, arg$)
@@ -865,14 +814,14 @@ FUNCTION dropDatabase%% (this$, arg$)
     IniClose
 
     dropDatabase%% = -1
-    IF verbose THEN PRINT "Database dropped."
+    IF QBSQL_verbose THEN PRINT "Database dropped."
 END FUNCTION
 
 FUNCTION backupDatabase%% (this$, arg$)
     fileName$ = toFile(this$)
 
     IF _FILEEXISTS(fileName$) = 0 THEN
-        IF verbose THEN PRINT "Database '" + this$ + "' does not exist."
+        IF QBSQL_verbose THEN PRINT "Database '" + this$ + "' does not exist."
         EXIT FUNCTION
     END IF
     IF _FILEEXISTS(arg$) THEN KILL arg$
@@ -888,7 +837,7 @@ FUNCTION backupDatabase%% (this$, arg$)
 
     CLOSE f1, f2
     backupDatabase%% = -1
-    IF verbose THEN PRINT "Database backup successfully created."
+    IF QBSQL_verbose THEN PRINT "Database backup successfully created."
 END FUNCTION
 
 FUNCTION toFile$ (__this$)
