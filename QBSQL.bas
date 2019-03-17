@@ -2,6 +2,83 @@
 'Draws inspiration from SQL, hence the name.
 'Fellippe Heitor, 2019
 
+CONST QBSQL_verbose = -1
+
+DO
+    INPUT c$
+
+    IF parse(c$, "LOAD") THEN
+        result = loadDatabase(nextParameter(c$), tableCount$)
+        IF NOT result THEN PRINT "Error loading database." ELSE PRINT tableCount$; " tables."
+        _CONTINUE
+    END IF
+
+    IF parse(c$, "EXIT") THEN
+        result = commit
+        SYSTEM
+    END IF
+LOOP
+
+FUNCTION parse%% (__c$, __text$)
+    c$ = UCASE$(__c$)
+    text$ = UCASE$(__text$)
+
+    parse%% = ((LEFT$(c$, LEN(text$) + 1) = text$ + " ") OR c$ = text$)
+END FUNCTION
+
+FUNCTION nextParameter$ (__text$)
+    STATIC lastText$
+    STATIC position1 AS LONG, position2 AS LONG
+    DIM text$, thisParameter$
+
+    text$ = LTRIM$(RTRIM$(__text$))
+    IF text$ <> lastText$ THEN
+        lastText$ = text$
+        position1 = INSTR(text$, "(")
+        IF position1 > 0 THEN
+            'check that this bracket is outside quotation marks
+            DIM quote AS _BYTE, i AS LONG
+            FOR i = 1 TO position1
+                IF ASC(text$, i) = 34 THEN quote = NOT quote
+            NEXT
+            IF quote THEN position1 = 0
+        END IF
+
+        IF position1 = 0 THEN
+            'no opening bracket; must be a sub call
+            position1 = INSTR(text$, " ")
+            IF position1 = 0 THEN EXIT FUNCTION
+            position1 = position1 + 1 'skip space
+        ELSE
+            position1 = position1 + 1 'skip bracket
+        END IF
+    END IF
+
+    position2 = INSTR(position1, text$, ",")
+    IF position2 = 0 THEN position2 = INSTR(position1, text$, ")")
+    IF position2 > 0 THEN
+        'check that this bracket is outside quotation marks
+        quote = False
+        FOR i = 1 TO position2
+            IF ASC(text$, i) = 34 THEN quote = NOT quote
+        NEXT
+        IF quote THEN position2 = 0
+    END IF
+    IF position2 = 0 THEN position2 = LEN(text$) + 1
+    thisParameter$ = LTRIM$(RTRIM$(MID$(text$, position1, position2 - position1)))
+    nextParameter$ = thisParameter$ 'removeQuotation$(thisParameter$, "'")
+    position1 = position2 + 1
+END FUNCTION
+
+FUNCTION removeQuotation$ (__text$, symbol$1)
+    DIM text$
+    text$ = __text$
+    IF LEFT$(text$, 1) = symbol$1 THEN text$ = MID$(text$, 2)
+    IF RIGHT$(text$, 1) = symbol$1 THEN text$ = LEFT$(text$, LEN(text$) - 1)
+    removeQuotation$ = text$
+END FUNCTION
+
+'------------------------------------------------------------------------------
 SUB QBSQL_Initialize
     SHARED IniDisableAutoCommit
     IniDisableAutoCommit = -1
